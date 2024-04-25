@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>neut's tower defense</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div id="wave-display">Wave: 1</div>
+    <button id="startbutton1" onclick="startGame('Stair')">start map 1</button>
+    <button id="startbutton2" onclick="startGame('SnakingLine')">start map 2</button>
+    <button onclick="toggleLevelEditorMode()">Level Editor</button>
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+
+    <!-- Preview div for the path -->ddd
+    <div id="path-preview"></div>
+
+    <div id="control-panel" style="display: none;">
+        <div id="turret-controls">
+            <button onclick="buyTurret('basic')">Buy Basic Turret</button>
+            <button onclick="buyTurret('sniper')">Buy Sniper Turret</button>
+        </div>
+        <button onclick="togglePause()">Pause</button>
+        <div id="cash-display">Cash: $0</div>
+    </div>
+    
+
+    <!-- Upgrade panel -->
+    <div id="upgrade-panel" style="display: none;">
+        <h3>Upgrade Options</h3>
+    </div>
+
+    <!-- Button to load maps -->
+    <button onclick="loadMaps()">Load Maps</button>
+
+    <!-- List of saved maps -->
+    <ul id="saved-maps"></ul>
+
+    <script src="scripts/def.js"></script>
+    <script src="scripts/game.js"></script>
+</body>
+</html>
