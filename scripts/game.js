@@ -17,6 +17,7 @@ const spriteScale = 1.8; // Scale at which enemy sprites are drawn
 const frameWidth = 48; // Width of each frame in the enemy sprite sheet
 const frameHeight = 30; // Height of each frame in the enemy sprite sheet
 const gridSize = 50; // Size of the grid used in the level editor
+let lastClickedTurret;
 
 const enemiesData = {
     'basic': {
@@ -246,7 +247,6 @@ function update(deltaTime) {
     checkAndPrepareNextWave();
     updateUI();
 }
-
 // Function to handle shooting mechanics for turrets
 function shootEnemies(turret, deltaTime) {
     if (!turret) {
@@ -368,6 +368,7 @@ function moveEnemies() {
                 }
             } else {
                 enemy.health = 0;
+                deductHealth(1); // Deduct health when enemy reaches the end
             }
         }
 
@@ -425,6 +426,8 @@ function buyTurret(turretType) {
         selectedTurretType = turretType;  // Set the selected turret type for placement
         updateUI();
         console.log(turretType + ' turret purchased, ready to place.');
+        // Add tower click listeners after placing the turret
+        addTowerClickListener(turretData);
     } else {
         console.log('Not enough cash to buy ' + turretType);
     }
@@ -459,10 +462,44 @@ function placeTurret(type, x, y) {
         rate: turretData.rate,
         damage: turretData.damage, // New property for turret damage
         lastShotTime: Date.now(),
+        upgrades: {} // Initialize upgrades property
     };
     game.turrets.push(turret);
     console.log(`Placed ${type} turret at (${x}, ${y})`);
-    render();
+    selectedTurretType = null; // Reset the selected turret type after placing
+    render(); // Update the canvas to reflect the newly placed turret
+
+    // Add click listener for the placed turret
+    addTowerClickListener(turret);
+}
+
+
+function removeTowerClickListener(turret) {
+    const turretIndex = game.turrets.indexOf(turret);
+    const towerElement = document.getElementById(`turret-${turretIndex}`);
+    if (towerElement) {
+        towerElement.removeEventListener('click', displayUpgradeMenu); // Remove click listener
+    }
+}
+
+const sellTurretButton = document.getElementById('sellTurretButton');
+sellTurretButton.addEventListener('click', sellTurret);
+
+function sellTurret() {
+    if (lastClickedTurret) {
+        // Remove the last clicked turret from the game.turrets array
+        const index = game.turrets.indexOf(lastClickedTurret);
+        if (index !== -1) {
+            game.turrets.splice(index, 1);
+            removeTowerClickListener(lastClickedTurret);
+            // Other actions related to selling the turret
+            lastClickedTurret = null; // Reset lastClickedTurret
+            game.selectedTurret = null; // Deselect the turret
+            render(); // Update the canvas to reflect the changes
+        }
+    } else {
+        console.error("No turret selected to sell.");
+    }
 }
 
 // Updates the UI components
@@ -509,6 +546,7 @@ function updateUI() {
     }
 }
 
+
 // Draws turrets on the canvas
 function drawTurrets() {
     game.turrets.forEach((turret, index) => {
@@ -520,31 +558,37 @@ function drawTurrets() {
         }
         ctx.arc(turret.x, turret.y, 15, 0, 2 * Math.PI);  // Draw turret with radius 15
         ctx.fill();
+
+        // Set ID for turret element
+        const turretElement = document.getElementById(`turret-${index}`);
+        if (turretElement) {
+            turretElement.id = `turret-${index}`;
+        }
     });
 }
 
-// Setup event listener for turret clicks
-document.getElementById('gameCanvas').addEventListener('click', function(event) {
-    game.turrets.forEach((turret, index) => {
-        const rect = this.getBoundingClientRect();
-        const x = event.clientX - rect.left;
-        const y = event.clientY - rect.top;
-        const dx = x - turret.x;
-        const dy = y - turret.y;
-        const distance = Math.sqrt(dx ** 2 + dy ** 2);
-        
-        // Check if the click is within the bounds of the turret
-        if (distance <= 15) { // Assuming turret radius is 15 just for testing
-            // Turret clicked, handle turret click event here
-            console.log(`Turret ${index + 1} clicked`);
-            displayUpgradeMenu(turret);
-        }
-    });
-});
-
 // Displays upgrade options for the clicked turret
 function displayUpgradeMenu(turret) {
-   
+    const upgradePanel = document.getElementById('upgrade-panel');
+    upgradePanel.innerHTML = ''; // Clear previous upgrade options
+
+    if (!turret.upgrades || Object.keys(turret.upgrades).length === 0) {
+        console.log("Turret upgrades not found or empty.");
+        return;
+    }
+
+    // Populate upgrade options
+    for (let upgradeType in turret.upgrades) {
+        let upgradeOption = upgradeOptions[upgradeType];
+        if (upgradeOption && turret.upgrades[upgradeType] < upgradeOption.maxLevel && game.cash >= upgradeOption.cost) {
+            let upgradeButton = document.createElement('button');
+            upgradeButton.textContent = `Upgrade ${upgradeType} ($${upgradeOption.cost})`;
+            upgradeButton.onclick = function() {
+                upgradeTurret(turret, upgradeType);
+            };
+            upgradePanel.appendChild(upgradeButton);
+        }
+    }
 }
 
 // Creates a click listener for each turret
@@ -558,14 +602,24 @@ function createTurretClickListener(turret, index) {
         const dx = x - turret.x;
         const dy = y - turret.y;
         const distance = Math.sqrt(dx ** 2 + dy ** 2);
-        if (distance <= 15) { // Assuming turret radius is 15
+        
+        // Ensure that the event target is the turret element
+        if (event.target === this && distance <= 15) { // Assuming turret radius is 15
             // Turret clicked, handle turret click event here
-            console.log(`Turret ${index + 1} clicked`);
+            console.log(`Turret ${index + 1} clicked: ${turret.type}`);
             // Implement your logic for turret click event here
+            
+            // Display some information about the turret
+            console.log(`Turret Type: ${turret.type}`);
+            console.log(`Turret Damage: ${turret.damage}`);
+            console.log(`Turret Range: ${turret.range}`);
+            console.log(`Turret Rate of Fire: ${turret.rate}`);
+            
+            // Display upgrade options for the clicked turret
+            displayUpgradeMenu(turret);
         }
     };
 }
-
 // Pre-loads enemy sprites
 Object.keys(enemiesData).forEach(type => {
     enemiesData[type].spriteSheet.src = `sprites/${type}.png`;
@@ -578,6 +632,7 @@ const upgradeOptions = {
     damage: { cost: 150, maxLevel: 3 }
 };
 
+
 // Upgrades a turret's properties
 function upgradeTurret(turret, upgradeType) {
     const upgradeOption = upgradeOptions[upgradeType];
@@ -586,7 +641,7 @@ function upgradeTurret(turret, upgradeType) {
         return;
     }
 
-    const currentLevel = turret.upgrades[upgradeType];
+    const currentLevel = turret.upgrades[upgradeType] || 0;
     const maxLevel = upgradeOption.maxLevel;
 
     if (currentLevel < maxLevel && game.cash >= upgradeOption.cost) {
@@ -594,7 +649,7 @@ function upgradeTurret(turret, upgradeType) {
         game.cash -= upgradeOption.cost;
 
         // Apply the upgrade
-        turret.upgrades[upgradeType]++;
+        turret.upgrades[upgradeType] = currentLevel + 1;
 
         // Update turret properties based on the upgrade
         switch (upgradeType) {
@@ -650,27 +705,40 @@ function displayTurretInfoAndOptions(turret) {
     showUpgradeOptions(turret);
 }
 
-// Adds click listeners to turret representations in the UI
-function addTowerClickListeners() {
-    const towerElements = document.querySelectorAll('.tower');
-
-    towerElements.forEach(towerElement => {
+function addTowerClickListener(turret) {
+    let turretIndex = game.turrets.indexOf(turret);
+    if (turretIndex === -1) {
+        // Add the turret to the game.turrets array if not already present
+        game.turrets.push(turret);
+        turretIndex = game.turrets.length - 1; // Update the turret index
+    }
+    
+    console.log("Turret index:", turretIndex);
+    const towerElement = document.getElementById(`turret-${turretIndex}`);
+    if (towerElement) {
+        console.log("Tower element:", towerElement);
         towerElement.addEventListener('click', function(event) {
-            // Retrieve the turret object corresponding to the clicked tower
-            const turretIndex = parseInt(towerElement.dataset.index);
-            const selectedTurret = game.turrets[turretIndex];
-
-            // Calculate the position of the turret relative to the canvas
-            const canvasRect = canvas.getBoundingClientRect();
-            const turretX = selectedTurret.x - canvasRect.left;
-            const turretY = selectedTurret.y - canvasRect.top;
-
-            // Display upgrade panel for the selected turret
-            showUpgradePanel(turretX, turretY);
-            showUpgradeOptions(selectedTurret);
-            displayTurretInfoAndOptions(selectedTurret);
+            console.log(`Clicked on turret: ${turret.type} at position (${turret.x}, ${turret.y})`);
+            // Check if the turret click listener already exists
+            if (!towerElement.hasClickListener) {
+                // Deselect the previously selected turret, if any
+                if (game.selectedTurret) {
+                    const prevSelectedTurretIndex = game.turrets.indexOf(game.selectedTurret);
+                    const prevSelectedTurretElement = document.getElementById(`turret-${prevSelectedTurretIndex}`);
+                    if (prevSelectedTurretElement) {
+                        prevSelectedTurretElement.classList.remove('selected');
+                    }
+                }
+                
+                // Handle the click event
+                displayUpgradeMenu(turret);
+                lastClickedTurret = turret; // Set lastClickedTurret to the clicked turret
+                game.selectedTurret = turret; // Set the clicked turret as selected
+                towerElement.classList.add('selected'); // Add 'selected' class for visual feedback
+                towerElement.hasClickListener = true;
+            }
         });
-    });
+    }
 }
 
 // Draws enemies on the canvas based on their sprite sheets
@@ -714,8 +782,31 @@ var game = {
     cash: 100, // Starting cash, adjust as needed for game balance
     paused: false,
     turrets: [], // Array to store placed turrets
-    // Additional game properties...
+    health:10,
+    
 };
+function endGame() {
+    // Display end game message or perform any other end game actions
+    
+    alert("Game Over!");
+    
+    // Add a restart button or refresh option
+    const restartButton = document.createElement('button');
+    restartButton.textContent = 'Restart';
+    restartButton.addEventListener('click', function() {
+        // Reload the page to restart the game
+        location.reload();
+    });
+
+    // Append the restart button to the body or a specific container
+    document.body.appendChild(restartButton);
+}
+function deductHealth(points) {
+    game.health -= points;
+    if (game.health <= 0) {
+        endGame(); // Function to end the game when health reaches zero
+    }
+}
 
 // Starts a new game with the specified map
 function startGame(mapName) {
@@ -738,13 +829,13 @@ function startGame(mapName) {
     }, 1000);
     gameInterval = requestAnimationFrame(gameLoop);
 }
-
 // Initializes game settings
 function initGame() {
     enemies = []; // Clear previous game enemies
     turrets = []; // Clear previous game turrets
     spawnCounter = 0; // Reset the spawn counter
     loadMap(currentMap);  // Ensure the map is loaded with settings
+    game.turrets.forEach(addTowerClickListener);
 }
 
 // Draws a preview of turret placement on the canvas
@@ -765,12 +856,10 @@ document.getElementById('gameCanvas').addEventListener('mousemove', function(eve
         render();
     }
 });
-
-
 // Validates turret placement
 function isValidPlacement(x, y) {
     // Check distance from other turrets first
-    for (let turret of turrets) {
+    for (let turret of game.turrets) {
         let dx = turret.x - x;
         let dy = turret.y - y;
         let distance = Math.sqrt(dx * dx + dy * dy);
@@ -779,7 +868,6 @@ function isValidPlacement(x, y) {
             return false;
         }
     }
-
     // Check if placement is on the path
     for (let i = 0; i < currentPath.length - 1; i++) {
         const start = currentPath[i];
@@ -789,7 +877,6 @@ function isValidPlacement(x, y) {
             return false;
         }
     }
-
     return true; // Valid if not close to turrets and not on the path
 }
 
@@ -807,10 +894,24 @@ function render() {
         if (selectedTurretType) {
             drawTurretPlacementPreview();
         }
-        // Add tower click event listeners after drawing turrets
-    } 
-}
+        
+        // Select the container where you want to append the turret elements
+        const turretContainer = document.getElementById('gameCanvas'); 
 
+        // Clear previous turret elements from the container
+        turretContainer.innerHTML = '';
+
+        // Iterate through game.turrets and create turret elements
+        game.turrets.forEach((turret, index) => {
+            const turretElement = document.createElement('div');
+            turretElement.id = `turret-${index}`;
+            turretElement.classList.add('turret'); // Optionally, you can add a CSS class for styling
+            turretContainer.appendChild(turretElement); // Append the turret element to the container
+        });
+
+
+    }
+}
 // Checks if a point is near a line within a given tolerance
 function isPointNearLine(px, py, x1, y1, x2, y2, tolerance) {
     let L2 = ((x2 - x1) ** 2 + (y2 - y1) ** 2);
@@ -820,8 +921,6 @@ function isPointNearLine(px, py, x1, y1, x2, y2, tolerance) {
     let s = ((y1 - py) * (x2 - x1) - (x1 - px) * (y2 - y1)) / L2;
     return Math.abs(s) * Math.sqrt(L2) < tolerance;
 }
-
-
 // Loads a map and sets it as the current path
 function loadMap(mapName) {
     // Assuming you define what happens when a map loads:
