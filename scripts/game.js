@@ -649,7 +649,6 @@ function displayTurretInfoAndOptions(turret) {
     
     showUpgradeOptions(turret);
 }
-const selectedTurret =
 
 // Adds click listeners to turret representations in the UI
 function addTowerClickListeners() {
